@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:eco_quest_vr/screens/auth_screens/login_screen.dart';
+import 'package:eco_quest_vr/seelcted_country_notifier.dart';
 import 'package:eco_quest_vr/utils/custom_field.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -11,14 +13,8 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  String? selectedCountry;
+  SelectedCountry selectedCountry = SelectedCountry();
 
-  List<String> countries = [
-    'Nigeria',
-    'United States',
-    'Canada',
-    // Add more countries here
-  ];
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,28 +80,38 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.only(right: 8.0),
-                  child: DropdownButtonFormField(
-                    value: selectedCountry,
-                    items: countries.map((country) {
-                      return DropdownMenuItem(
-                        alignment: AlignmentDirectional.centerStart,
-                        value: country,
-                        child: Text(
-                          country,
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedCountry = value;
-                      });
-                    },
-                    decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        labelText: 'Country',
-                        contentPadding: EdgeInsets.only(left: 20, top: 10.0)),
-                  ),
+                  child: FutureBuilder(
+                      future: FirebaseFirestore.instance
+                          .collection('countries')
+                          .get(),
+                      builder: (context, snapshot) {
+                        print('snapshot.data ${snapshot.data?.docs[0].data()}');
+                        List<Country> countries = snapshot.data?.docs
+                                .map<Country>((e) => Country.fromSnapshot(e))
+                                .toList() ??
+                            [];
+                        return DropdownButtonFormField<Country>(
+                          value: selectedCountry.value,
+                          items: countries.map((country) {
+                            return DropdownMenuItem(
+                              alignment: AlignmentDirectional.centerStart,
+                              value: country,
+                              child: Text(
+                                country.name,
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            selectedCountry.update(value!);
+                          },
+                          decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              labelText: 'Country',
+                              contentPadding:
+                                  EdgeInsets.only(left: 20, top: 10.0)),
+                        );
+                      }),
                 ),
               ),
               const SizedBox(
@@ -177,4 +183,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
       ),
     );
   }
+}
+
+class Country {
+  final String name;
+  final String id;
+  final String shortCode;
+
+  Country({
+    required this.name,
+    required this.shortCode,
+    required this.id,
+  });
+
+  factory Country.fromSnapshot(DocumentSnapshot snap) {
+    Map json = snap.data() as Map;
+    return Country(
+      name: json['name'] ?? '',
+      shortCode: json['shortCode'],
+      id: snap.id,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is Country && id == other.id;
+  }
+
+  @override
+  int get hashCode => super.hashCode;
 }
